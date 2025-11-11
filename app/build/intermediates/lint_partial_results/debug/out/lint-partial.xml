@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.2.0" type="partial_results">
+    <map id="UnsafeIntentLaunch">
+            <map id="unprotected">
+                <entry
+                    name="com.emergency.mesh.MainActivity"
+                    boolean="true"/>
+            </map>
+    </map>
+    <map id="NotificationPermission">
+        <entry
+            name="source"
+            boolean="true"/>
+    </map>
+    <map id="UnusedResources">
+        <location id="R.string.notification_channel_name"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/values/strings.xml"
+            line="4"
+            column="13"
+            startOffset="115"
+            endLine="4"
+            endColumn="45"
+            endOffset="147"/>
+        <entry
+            name="model"
+            string="attr[colorPrimaryVariant(R)],id[lvMessages(U),btnSendText(U),btnSOS(U),tvStatus(U),btnRecordVoice(U),etMessage(U),tvPeerCount(U)],layout[activity_main(U)],string[notification_channel_description(D),app_name(U),notification_channel_name(D)],style[Theme_EmergencyMesh(U),Theme_MaterialComponents_DayNight_DarkActionBar(R)];c^d^0;;;"/>
+        <location id="R.string.notification_channel_description"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/values/strings.xml"
+            line="5"
+            column="13"
+            startOffset="182"
+            endLine="5"
+            endColumn="52"
+            endOffset="221"/>
+    </map>
+
+</incidents>

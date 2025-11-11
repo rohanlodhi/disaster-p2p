@@ -24,12 +24,14 @@ class WiFiDirectManager(private val context: Context) {
     private var channel: WifiP2pManager.Channel? = null
     
     private val peers = ConcurrentHashMap<String, WifiP2pDevice>()
+    private val connectedPeerAddresses = ConcurrentHashMap<String, InetAddress>()
     private val messageCallbacks = mutableListOf<(MeshMessage) -> Unit>()
     private val peerCallbacks = mutableListOf<(MeshPeer) -> Unit>()
     
     private var serverSocket: ServerSocket? = null
     private var isServerRunning = false
     private var groupOwnerAddress: InetAddress? = null
+    private var isGroupOwner = false
 
     companion object {
         private const val TAG = "WiFiDirectManager"
@@ -143,6 +145,14 @@ class WiFiDirectManager(private val context: Context) {
         thread {
             try {
                 socket.soTimeout = SOCKET_TIMEOUT_MS
+                val clientAddress = socket.inetAddress
+                
+                // Store client address if we're the group owner
+                if (isGroupOwner) {
+                    connectedPeerAddresses[clientAddress.hostAddress ?: ""] = clientAddress
+                    Log.d(TAG, "Registered client: ${clientAddress.hostAddress}")
+                }
+                
                 val inputStream = ObjectInputStream(socket.getInputStream())
                 
                 val message = inputStream.readObject() as? MeshMessage
@@ -159,25 +169,40 @@ class WiFiDirectManager(private val context: Context) {
     }
 
     /**
-     * Send message to group owner or client
+     * Send message to group owner or all clients
      */
     fun sendMessage(message: MeshMessage) {
-        groupOwnerAddress?.let { address ->
-            thread {
-                try {
-                    val socket = Socket()
-                    socket.connect(InetSocketAddress(address, SERVER_PORT), SOCKET_TIMEOUT_MS)
-                    
-                    val outputStream = ObjectOutputStream(socket.getOutputStream())
-                    outputStream.writeObject(message)
-                    outputStream.flush()
-                    
-                    socket.close()
-                    Log.d(TAG, "Message sent via Wi-Fi Direct")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error sending message", e)
+        thread {
+            if (isGroupOwner) {
+                // We're the group owner - send to all connected clients
+                connectedPeerAddresses.values.forEach { address ->
+                    sendToAddress(address, message)
+                }
+            } else {
+                // We're a client - send to group owner
+                groupOwnerAddress?.let { address ->
+                    sendToAddress(address, message)
                 }
             }
+        }
+    }
+    
+    /**
+     * Send message to specific address
+     */
+    private fun sendToAddress(address: InetAddress, message: MeshMessage) {
+        try {
+            val socket = Socket()
+            socket.connect(InetSocketAddress(address, SERVER_PORT), SOCKET_TIMEOUT_MS)
+            
+            val outputStream = ObjectOutputStream(socket.getOutputStream())
+            outputStream.writeObject(message)
+            outputStream.flush()
+            
+            socket.close()
+            Log.d(TAG, "Message sent to ${address.hostAddress}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending message to ${address.hostAddress}", e)
         }
     }
 
@@ -285,9 +310,11 @@ class WiFiDirectManager(private val context: Context) {
                 if (info.groupFormed) {
                     if (info.isGroupOwner) {
                         Log.d(TAG, "This device is group owner")
+                        isGroupOwner = true
                         startServer()
                     } else {
                         Log.d(TAG, "Connected to group owner: ${info.groupOwnerAddress}")
+                        isGroupOwner = false
                         groupOwnerAddress = info.groupOwnerAddress
                     }
                 }

@@ -26,6 +26,7 @@ class BLEManager(private val context: Context) {
     private var gattServer: BluetoothGattServer? = null
     
     private val connectedDevices = ConcurrentHashMap<String, BluetoothDevice>()
+    private val gattClients = ConcurrentHashMap<String, BluetoothGatt>()
     private val messageCallbacks = mutableListOf<(MeshMessage) -> Unit>()
     private val peerCallbacks = mutableListOf<(MeshPeer) -> Unit>()
     
@@ -181,11 +182,72 @@ class BLEManager(private val context: Context) {
     }
 
     /**
-     * Send data to specific device
+     * Send data to specific device via GATT connection
      */
     private fun sendToDevice(device: BluetoothDevice, data: ByteArray) {
-        // In real implementation, would use GATT connection to write data
-        Log.d(TAG, "Sending ${data.size} bytes to ${device.address}")
+        try {
+            // Check if we already have a GATT connection
+            val existingGatt = gattClients[device.address]
+            if (existingGatt != null) {
+                // Use existing connection
+                writeToGatt(existingGatt, data)
+            } else {
+                // Create new GATT connection
+                val gatt = device.connectGatt(context, false, object : BluetoothGattCallback() {
+                    override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            Log.d(TAG, "GATT connected to ${device.address}")
+                            gatt?.discoverServices()
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            Log.d(TAG, "GATT disconnected from ${device.address}")
+                            gattClients.remove(device.address)
+                            gatt?.close()
+                        }
+                    }
+                    
+                    override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+                        if (status == BluetoothGatt.GATT_SUCCESS) {
+                            gatt?.let {
+                                gattClients[device.address] = it
+                                writeToGatt(it, data)
+                            }
+                        }
+                    }
+                })
+                
+                if (gatt != null) {
+                    gattClients[device.address] = gatt
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception sending to device", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending to device", e)
+        }
+    }
+    
+    /**
+     * Write data to GATT characteristic
+     */
+    private fun writeToGatt(gatt: BluetoothGatt, data: ByteArray) {
+        try {
+            val service = gatt.getService(SERVICE_UUID)
+            val characteristic = service?.getCharacteristic(MESSAGE_CHARACTERISTIC_UUID)
+            
+            if (characteristic != null) {
+                characteristic.value = data
+                val success = gatt.writeCharacteristic(characteristic)
+                if (success) {
+                    Log.d(TAG, "Sent ${data.size} bytes via GATT")
+                } else {
+                    Log.e(TAG, "Failed to write GATT characteristic")
+                }
+            } else {
+                Log.e(TAG, "Message characteristic not found")
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception writing to GATT", e)
+        }
     }
 
     /**
@@ -347,8 +409,10 @@ class BLEManager(private val context: Context) {
         stopScanning()
         try {
             gattServer?.close()
+            gattClients.values.forEach { it.close() }
+            gattClients.clear()
         } catch (e: SecurityException) {
-            Log.e(TAG, "Security exception closing GATT server", e)
+            Log.e(TAG, "Security exception closing GATT connections", e)
         }
         connectedDevices.clear()
     }

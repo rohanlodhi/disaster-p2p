@@ -1,0 +1,7 @@
+#Sun Nov 09 16:43:51 IST 2025
+base.0=/home/rohan/Desktop/flame-courses/imp/EmergencyMesh/app/build/intermediates/dex/release/mergeDexRelease/classes.dex
+base.1=/home/rohan/Desktop/flame-courses/imp/EmergencyMesh/app/build/intermediates/dex/release/mergeDexRelease/classes2.dex
+path.0=classes.dex
+path.1=classes2.dex
+renamed.0=classes.dex
+renamed.1=classes2.dex

@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.2.0" type="incidents">
+
+    <incident
+        id="HardcodedText"
+        severity="warning"
+        message="Hardcoded string &quot;Status: Initializing...&quot;, should use `@string` resource">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="14"
+            column="9"
+            startOffset="464"
+            endLine="14"
+            endColumn="47"
+            endOffset="502"/>
+    </incident>
+
+    <incident
+        id="HardcodedText"
+        severity="warning"
+        message="Hardcoded string &quot;Peers: 0&quot;, should use `@string` resource">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="23"
+            column="9"
+            startOffset="760"
+            endLine="23"
+            endColumn="32"
+            endOffset="783"/>
+    </incident>
+
+    <incident
+        id="HardcodedText"
+        severity="warning"
+        message="Hardcoded string &quot;🚨 EMERGENCY SOS&quot;, should use `@string` resource">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="33"
+            column="9"
+            startOffset="1051"
+            endLine="33"
+            endColumn="40"
+            endOffset="1082"/>
+    </incident>
+
+    <incident
+        id="Autofill"
+        severity="warning"
+        message="Missing `autofillHints` attribute">
+        <fix-alternatives>
+            <fix-attribute
+                description="Set autofillHints"
+                namespace="http://schemas.android.com/apk/res/android"
+                attribute="autofillHints"
+                value=""
+                dot="0"
+                mark="0"/>
+            <fix-attribute
+                description="Set importantForAutofill=&quot;no&quot;"
+                namespace="http://schemas.android.com/apk/res/android"
+                attribute="importantForAutofill"
+                value="no"/>
+        </fix-alternatives>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="47"
+            column="10"
+            startOffset="1508"
+            endLine="47"
+            endColumn="18"
+            endOffset="1516"/>
+    </incident>
+
+    <incident
+        id="HardcodedText"
+        severity="warning"
+        message="Hardcoded string &quot;Type message...&quot;, should use `@string` resource">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="52"
+            column="13"
+            startOffset="1695"
+            endLine="52"
+            endColumn="43"
+            endOffset="1725"/>
+    </incident>
+
+    <incident
+        id="HardcodedText"
+        severity="warning"
+        message="Hardcoded string &quot;SEND&quot;, should use `@string` resource">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="62"
+            column="13"
+            startOffset="2043"
+            endLine="62"
+            endColumn="32"
+            endOffset="2062"/>
+    </incident>
+
+    <incident
+        id="HardcodedText"
+        severity="warning"
+        message="Hardcoded string &quot;🎤 Record Voice&quot;, should use `@string` resource">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="73"
+            column="9"
+            startOffset="2347"
+            endLine="73"
+            endColumn="39"
+            endOffset="2377"/>
+    </incident>
+
+    <incident
+        id="HardcodedText"
+        severity="warning"
+        message="Hardcoded string &quot;Received Messages:&quot;, should use `@string` resource">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="83"
+            column="9"
+            startOffset="2675"
+            endLine="83"
+            endColumn="42"
+            endOffset="2708"/>
+    </incident>
+
+    <incident
+        id="SetTextI18n"
+        severity="warning"
+        message="Do not concatenate text displayed with `setText`. Use resource string with placeholders.">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/emergency/mesh/MainActivity.kt"
+            line="320"
+            column="36"
+            startOffset="10528"
+            endLine="320"
+            endColumn="58"
+            endOffset="10550"/>
+    </incident>
+
+    <incident
+        id="SetTextI18n"
+        severity="warning"
+        message="String literal in `setText` can not be translated. Use Android resources instead.">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/emergency/mesh/MainActivity.kt"
+            line="320"
+            column="37"
+            startOffset="10529"
+            endLine="320"
+            endColumn="44"
+            endOffset="10536"/>
+    </incident>
+
+    <incident
+        id="SetTextI18n"
+        severity="warning"
+        message="String literal in `setText` can not be translated. Use Android resources instead.">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/emergency/mesh/MainActivity.kt"
+            line="120"
+            column="40"
+            startOffset="3766"
+            endLine="120"
+            endColumn="55"
+            endOffset="3781"/>
+    </incident>
+
+    <incident
+        id="SetTextI18n"
+        severity="warning"
+        message="String literal in `setText` can not be translated. Use Android resources instead.">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/emergency/mesh/MainActivity.kt"
+            line="123"
+            column="40"
+            startOffset="3881"
+            endLine="123"
+            endColumn="56"
+            endOffset="3897"/>
+    </incident>
+
+    <incident
+        id="ObsoleteSdkInt"
+        severity="warning"
+        message="Unnecessary; SDK_INT is always >= 26">
+        <fix-data conditional="true"/>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/emergency/mesh/MainActivity.kt"
+            line="243"
+            column="13"
+            startOffset="8010"
+            endLine="243"
+            endColumn="59"
+            endOffset="8056"/>
+    </incident>
+
+    <incident
+        id="SetTextI18n"
+        severity="warning"
+        message="String literal in `setText` can not be translated. Use Android resources instead.">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/emergency/mesh/MainActivity.kt"
+            line="360"
+            column="40"
+            startOffset="11619"
+            endLine="360"
+            endColumn="55"
+            endOffset="11634"/>
+    </incident>
+
+    <incident
+        id="ObsoleteSdkInt"
+        severity="warning"
+        message="Unnecessary; SDK_INT is always >= 26">
+        <fix-data conditional="true"/>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/emergency/mesh/services/MeshService.kt"
+            line="141"
+            column="13"
+            startOffset="4148"
+            endLine="141"
+            endColumn="59"
+            endOffset="4194"/>
+    </incident>
+
+    <incident
+        id="OldTargetApi"
+        severity="warning"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the android.os.Build.VERSION_CODES javadoc for details.">
+        <fix-replace
+            description="Update targetSdkVersion to 36"
+            oldString="34"
+            replacement="36"/>
+        <location
+            file="${:app*projectDir}/build.gradle"
+            line="13"
+            column="9"
+            startOffset="237"
+            endLine="13"
+            endColumn="21"
+            endOffset="249"/>
+    </incident>
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of androidx.core:core-ktx than 1.12.0 is available: 1.17.0">
+        <fix-replace
+            description="Change to 1.17.0"
+            family="Update versions"
+            oldString="1.12.0"
+            replacement="1.17.0"/>
+        <location
+            file="${:app*projectDir}/build.gradle"
+            line="40"
+            column="20"
+            startOffset="766"
+            endLine="40"
+            endColumn="51"
+            endOffset="797"/>
+    </incident>
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of androidx.appcompat:appcompat than 1.6.1 is available: 1.7.1">
+        <fix-replace
+            description="Change to 1.7.1"
+            family="Update versions"
+            oldString="1.6.1"
+            replacement="1.7.1"/>
+        <location
+            file="${:app*projectDir}/build.gradle"
+            line="41"
+            column="20"
+            startOffset="817"
+            endLine="41"
+            endColumn="56"
+            endOffset="853"/>
+    </incident>
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of com.google.android.material:material than 1.11.0 is available: 1.13.0">
+        <fix-replace
+            description="Change to 1.13.0"
+            family="Update versions"
+            oldString="1.11.0"
+            replacement="1.13.0"/>
+        <location
+            file="${:app*projectDir}/build.gradle"
+            line="42"
+            column="20"
+            startOffset="873"
+            endLine="42"
+            endColumn="65"
+            endOffset="918"/>
+    </incident>
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of androidx.constraintlayout:constraintlayout than 2.1.4 is available: 2.2.1">
+        <fix-replace
+            description="Change to 2.2.1"
+            family="Update versions"
+            oldString="2.1.4"
+            replacement="2.2.1"/>
+        <location
+            file="${:app*projectDir}/build.gradle"
+            line="43"
+            column="20"
+            startOffset="938"
+            endLine="43"
+            endColumn="70"
+            endOffset="988"/>
+    </incident>
+
+    <incident
+        id="GradleDependency"
+        severity="warning"
+        message="A newer version of com.google.android.gms:play-services-location than 21.0.1 is available: 21.3.0">
+        <fix-replace
+            description="Change to 21.3.0"
+            family="Update versions"
+            oldString="21.0.1"
+            replacement="21.3.0"/>
+        <location
+            file="${:app*projectDir}/build.gradle"
+            line="44"
+            column="20"
+            startOffset="1008"
+            endLine="44"
+            endColumn="74"
+            endOffset="1062"/>
+    </incident>
+
+    <incident
+        id="Overdraw"
+        severity="warning"
+        message="Possible overdraw: Root element paints background `#FFFFFF` with a theme that also paints a background (inferred theme is `@style/Theme.EmergencyMesh`)">
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/layout/activity_main.xml"
+            line="7"
+            column="5"
+            startOffset="259"
+            endLine="7"
+            endColumn="33"
+            endOffset="287"/>
+    </incident>
+
+</incidents>
