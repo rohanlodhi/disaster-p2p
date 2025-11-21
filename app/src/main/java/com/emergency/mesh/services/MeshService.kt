@@ -25,7 +25,7 @@ class MeshService : Service() {
     private lateinit var messageHandler: MessageHandler
     
     private val binder = MeshBinder()
-    private val serviceCallbacks = mutableListOf<MeshServiceCallback>()
+    private val serviceCallbacks = java.util.concurrent.CopyOnWriteArrayList<MeshServiceCallback>()
 
     companion object {
         private const val TAG = "MeshService"

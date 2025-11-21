@@ -10,6 +10,7 @@ import com.emergency.mesh.models.MeshPeer
 import java.io.*
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Manages Bluetooth Low Energy connections for mesh networking
@@ -27,9 +28,16 @@ class BLEManager(private val context: Context) {
     
     private val connectedDevices = ConcurrentHashMap<String, BluetoothDevice>()
     private val gattClients = ConcurrentHashMap<String, BluetoothGatt>()
-    private val messageCallbacks = mutableListOf<(MeshMessage) -> Unit>()
-    private val peerCallbacks = mutableListOf<(MeshPeer) -> Unit>()
+    private val messageCallbacks = java.util.concurrent.CopyOnWriteArrayList<(MeshMessage) -> Unit>()
+    private val peerCallbacks = java.util.concurrent.CopyOnWriteArrayList<(MeshPeer) -> Unit>()
     
+    // New properties for reliable data transfer
+    private val writeQueues = ConcurrentHashMap<String, ConcurrentLinkedQueue<ByteArray>>()
+    private val isWriting = ConcurrentHashMap<String, Boolean>()
+    private val deviceMtu = ConcurrentHashMap<String, Int>()
+    private val incomingBuffers = ConcurrentHashMap<String, ByteArrayOutputStream>()
+    private val deviceReady = ConcurrentHashMap<String, Boolean>()
+
     private var isAdvertising = false
     private var isScanning = false
 
@@ -186,38 +194,33 @@ class BLEManager(private val context: Context) {
      */
     private fun sendToDevice(device: BluetoothDevice, data: ByteArray) {
         try {
+            val address = device.address
+            
+            // Determine chunk size (MTU - 3 bytes overhead)
+            val mtu = deviceMtu[address] ?: 23
+            val chunkSize = mtu - 3
+            
+            // Split data into chunks
+            var offset = 0
+            while (offset < data.size) {
+                val length = Math.min(chunkSize, data.size - offset)
+                val chunk = ByteArray(length)
+                System.arraycopy(data, offset, chunk, 0, length)
+                
+                // Add to queue
+                writeQueues.computeIfAbsent(address) { ConcurrentLinkedQueue() }.add(chunk)
+                offset += length
+            }
+
             // Check if we already have a GATT connection
-            val existingGatt = gattClients[device.address]
+            val existingGatt = gattClients[address]
             if (existingGatt != null) {
-                // Use existing connection
-                writeToGatt(existingGatt, data)
+                if (deviceReady[address] == true) {
+                    processWriteQueue(address)
+                }
             } else {
                 // Create new GATT connection
-                val gatt = device.connectGatt(context, false, object : BluetoothGattCallback() {
-                    override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
-                        if (newState == BluetoothProfile.STATE_CONNECTED) {
-                            Log.d(TAG, "GATT connected to ${device.address}")
-                            gatt?.discoverServices()
-                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                            Log.d(TAG, "GATT disconnected from ${device.address}")
-                            gattClients.remove(device.address)
-                            gatt?.close()
-                        }
-                    }
-                    
-                    override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-                        if (status == BluetoothGatt.GATT_SUCCESS) {
-                            gatt?.let {
-                                gattClients[device.address] = it
-                                writeToGatt(it, data)
-                            }
-                        }
-                    }
-                })
-                
-                if (gatt != null) {
-                    gattClients[device.address] = gatt
-                }
+                device.connectGatt(context, false, gattClientCallback)
             }
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception sending to device", e)
@@ -236,17 +239,21 @@ class BLEManager(private val context: Context) {
             
             if (characteristic != null) {
                 characteristic.value = data
+                characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                 val success = gatt.writeCharacteristic(characteristic)
                 if (success) {
-                    Log.d(TAG, "Sent ${data.size} bytes via GATT")
+                    Log.d(TAG, "Initiated write of ${data.size} bytes via GATT")
                 } else {
-                    Log.e(TAG, "Failed to write GATT characteristic")
+                    Log.e(TAG, "Failed to initiate write GATT characteristic")
+                    isWriting[gatt.device.address] = false
                 }
             } else {
                 Log.e(TAG, "Message characteristic not found")
+                isWriting[gatt.device.address] = false
             }
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception writing to GATT", e)
+            isWriting[gatt.device.address] = false
         }
     }
 
@@ -302,6 +309,84 @@ class BLEManager(private val context: Context) {
             return false
         }
         return true
+    }
+
+    /**
+     * Process the write queue for a device
+     */
+    private fun processWriteQueue(address: String) {
+        if (isWriting[address] == true) return
+
+        val queue = writeQueues[address] ?: return
+        val chunk = queue.peek()
+
+        if (chunk != null) {
+            val gatt = gattClients[address]
+            if (gatt != null && deviceReady[address] == true) {
+                isWriting[address] = true
+                writeToGatt(gatt, chunk)
+            }
+        } else {
+            isWriting[address] = false
+        }
+    }
+
+    private val gattClientCallback = object : BluetoothGattCallback() {
+        override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+            val deviceAddress = gatt?.device?.address ?: return
+            
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.d(TAG, "GATT connected to $deviceAddress")
+                // Request higher MTU for faster transfer
+                gatt?.requestMtu(512)
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d(TAG, "GATT disconnected from $deviceAddress")
+                gattClients.remove(deviceAddress)
+                deviceReady[deviceAddress] = false
+                isWriting[deviceAddress] = false
+                gatt?.close()
+            }
+        }
+
+        override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
+            val deviceAddress = gatt?.device?.address ?: return
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "MTU changed to $mtu for $deviceAddress")
+                deviceMtu[deviceAddress] = mtu
+            }
+            // Proceed to discover services
+            gatt?.discoverServices()
+        }
+
+        override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+            val deviceAddress = gatt?.device?.address ?: return
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "Services discovered for $deviceAddress")
+                gattClients[deviceAddress] = gatt!!
+                deviceReady[deviceAddress] = true
+                processWriteQueue(deviceAddress)
+            }
+        }
+
+        override fun onCharacteristicWrite(gatt: BluetoothGatt?, characteristic: BluetoothGattCharacteristic?, status: Int) {
+            val deviceAddress = gatt?.device?.address ?: return
+            
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                // Remove the successfully written chunk
+                writeQueues[deviceAddress]?.poll()
+                isWriting[deviceAddress] = false
+                // Process next chunk
+                processWriteQueue(deviceAddress)
+            } else {
+                Log.e(TAG, "Failed to write characteristic: $status")
+                isWriting[deviceAddress] = false
+                // Retry? Or drop? For now, we'll retry the same chunk by not polling
+                // But to avoid infinite loop, maybe we should drop or limit retries.
+                // For simplicity, let's try to process again (maybe transient error)
+                // processWriteQueue(deviceAddress) 
+                // Actually, if we don't poll, it will retry the same chunk.
+            }
+        }
     }
 
     /**
@@ -365,6 +450,7 @@ class BLEManager(private val context: Context) {
                     } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                         Log.d(TAG, "Device disconnected: ${it.address}")
                         connectedDevices.remove(it.address)
+                        incomingBuffers.remove(it.address)
                     }
                 }
             } catch (e: SecurityException) {
@@ -383,12 +469,21 @@ class BLEManager(private val context: Context) {
         ) {
             try {
                 if (characteristic?.uuid == MESSAGE_CHARACTERISTIC_UUID && value != null) {
-                    Log.d(TAG, "Received message from ${device?.address}")
+                    Log.d(TAG, "Received chunk of ${value.size} bytes from ${device?.address}")
                     
-                    // Deserialize and process message
-                    val message = deserializeMessage(value)
-                    message?.let { msg ->
-                        messageCallbacks.forEach { callback -> callback(msg) }
+                    val address = device?.address ?: return
+                    val buffer = incomingBuffers.computeIfAbsent(address) { ByteArrayOutputStream() }
+                    buffer.write(value)
+                    
+                    // Try to deserialize
+                    val accumulatedData = buffer.toByteArray()
+                    val message = deserializeMessage(accumulatedData)
+                    
+                    if (message != null) {
+                        Log.d(TAG, "Successfully reassembled message from $address")
+                        messageCallbacks.forEach { callback -> callback(message) }
+                        // Clear buffer for next message
+                        incomingBuffers.remove(address)
                     }
                     
                     if (responseNeeded) {
@@ -397,6 +492,8 @@ class BLEManager(private val context: Context) {
                 }
             } catch (e: SecurityException) {
                 Log.e(TAG, "Security exception in characteristic write", e)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing write request", e)
             }
         }
     }

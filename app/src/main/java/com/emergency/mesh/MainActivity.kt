@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         lvMessages = findViewById(R.id.lvMessages)
         
         // Set up messages list
-        messagesAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, receivedMessages)
+        messagesAdapter = ArrayAdapter(this, R.layout.list_item_message, receivedMessages)
         lvMessages.adapter = messagesAdapter
         
         // Set up button listeners
@@ -297,20 +297,26 @@ class MainActivity : AppCompatActivity() {
      */
     private val serviceCallback = object : MeshService.MeshServiceCallback {
         override fun onMessageReceived(message: MeshMessage) {
+            Log.d(TAG, "Activity received message: ${message.id}. Current role: $userRole")
             runOnUiThread {
-                val formattedMessage = messageHandler.formatMessageForDisplay(message)
-                receivedMessages.add(0, formattedMessage)
-                
-                // Limit messages list
-                if (receivedMessages.size > 50) {
-                    receivedMessages.removeAt(receivedMessages.size - 1)
-                }
-                
-                messagesAdapter.notifyDataSetChanged()
-                
-                // Play voice message if applicable
-                if (message.type == com.emergency.mesh.models.MessageType.VOICE && message.audioData != null) {
-                    voiceHandler.playAudio(message.audioData)
+                try {
+                    val formattedMessage = messageHandler.formatMessageForDisplay(message)
+                    receivedMessages.add(0, formattedMessage)
+                    
+                    // Limit messages list
+                    if (receivedMessages.size > 50) {
+                        receivedMessages.removeAt(receivedMessages.size - 1)
+                    }
+                    
+                    messagesAdapter.notifyDataSetChanged()
+                    Log.d(TAG, "UI updated with message: ${message.id}")
+                    
+                    // Play voice message if applicable
+                    if (message.type == com.emergency.mesh.models.MessageType.VOICE && message.audioData != null) {
+                        voiceHandler.playAudio(message.audioData)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating UI with message", e)
                 }
             }
         }

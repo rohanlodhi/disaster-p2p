@@ -5,6 +5,7 @@ import android.util.Log
 import com.emergency.mesh.models.MeshMessage
 import com.emergency.mesh.models.MeshPeer
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Unified connection manager that handles both BLE and Wi-Fi Direct
@@ -18,8 +19,8 @@ class ConnectionManager(private val context: Context) {
     private val activePeers = ConcurrentHashMap<String, MeshPeer>()
     private val seenMessages = ConcurrentHashMap<String, Long>()
     
-    private val messageCallbacks = mutableListOf<(MeshMessage) -> Unit>()
-    private val peerCallbacks = mutableListOf<(List<MeshPeer>) -> Unit>()
+    private val messageCallbacks = CopyOnWriteArrayList<(MeshMessage) -> Unit>()
+    private val peerCallbacks = CopyOnWriteArrayList<(List<MeshPeer>) -> Unit>()
 
     companion object {
         private const val TAG = "ConnectionManager"
