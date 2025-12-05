@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
         lvMessages = findViewById(R.id.lvMessages)
         
         // Set up messages list
-        messagesAdapter = ArrayAdapter(this, R.layout.list_item_message, receivedMessages)
+        messagesAdapter = ArrayAdapter(this, R.layout.list_item_message, android.R.id.text1, receivedMessages)
         lvMessages.adapter = messagesAdapter
         
         // Set up button listeners
