@@ -43,7 +43,7 @@ Location: `/home/rohan/Desktop/flame-courses/imp/EmergencyMesh`
   - Graceful GPS fallback
   - Message formatting for display
 - [x] `VoiceHandler.kt` - Audio recording & playback
-  - 15-second max recording
+  - 30-second max recording
   - AudioRecord/AudioTrack implementation
   - Automatic cleanup
   - PCM audio format

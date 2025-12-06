@@ -19,7 +19,7 @@ Emergency Mesh is a **barebones, offline, decentralized Android application** de
 
 ✅ **Handler Layer** (`handlers/`)
 - `MessageHandler.kt` - GPS coordinate attachment and message creation
-- `VoiceHandler.kt` - Audio recording and playback (15-second max)
+- `VoiceHandler.kt` - Audio recording and playback (30-second max)
 
 ✅ **Service Layer** (`services/`)
 - `MeshService.kt` - Foreground service for background mesh operations

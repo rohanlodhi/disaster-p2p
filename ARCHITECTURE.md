@@ -51,7 +51,7 @@ EmergencyMesh is a decentralized, offline-first emergency communication system t
 #### VoiceHandler
 - **Recording**: AudioRecord API with 16kHz mono PCM
 - **Compression**: Raw PCM (no encoding for simplicity)
-- **Duration Limit**: 15-second hard limit with auto-stop
+- **Duration Limit**: 30-second hard limit with auto-stop
 - **Playback**: AudioTrack for received voice messages
 - **Cleanup**: Immediate deletion after transmission
 

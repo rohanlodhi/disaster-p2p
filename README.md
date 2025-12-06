@@ -87,7 +87,7 @@ The app requires the following permissions:
 ### Citizen Mode
 - **Send SOS**: Tap red emergency button to broadcast SOS with location
 - **Send Text**: Type message and tap SEND
-- **Voice Message**: Press "Record Voice", speak (max 15s), press again to send
+- **Voice Message**: Press "Record Voice", speak (max 30s), press again to send
 - **View Messages**: Scroll through received messages with coordinates
 
 ### Official Mode

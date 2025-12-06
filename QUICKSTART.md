@@ -128,7 +128,7 @@ Device A ←→ Device B ←→ Device C
 ### Voice Message Test
 
 1. Tap "🎤 Record Voice" button
-2. Speak for up to 15 seconds
+2. Speak for up to 30 seconds
 3. Tap "⏹ Stop Recording"
 4. Voice message sent to peers
 5. Recipients tap message to play audio

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary colors -->
+    <color name="colorPrimary">#FF5722</color>
+    <color name="colorPrimaryDark">#E64A19</color>
+    <color name="colorPrimaryVariant">#E64A19</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    
+    <!-- Secondary colors -->
+    <color name="colorSecondary">#4CAF50</color>
+    <color name="colorSecondaryVariant">#388E3C</color>
+    <color name="colorOnSecondary">#FFFFFF</color>
+    
+    <!-- Chat bubble colors -->
+    <color name="bubble_sent">#DCF8C6</color>
+    <color name="bubble_received">#FFFFFF</color>
+    <color name="bubble_sos">#FFCDD2</color>
+    <color name="bubble_voice">#E3F2FD</color>
+    
+    <!-- Text colors -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_sender">#1976D2</color>
+    <color name="text_time">#9E9E9E</color>
+    <color name="text_location">#0D47A1</color>
+    
+    <!-- Background colors -->
+    <color name="background_chat">#ECE5DD</color>
+    <color name="background_input">#FFFFFF</color>
+    <color name="background_status">#F5F5F5</color>
+    
+    <!-- SOS colors -->
+    <color name="sos_red">#D32F2F</color>
+    <color name="sos_red_dark">#B71C1C</color>
+    
+    <!-- Status colors -->
+    <color name="status_connected">#4CAF50</color>
+    <color name="status_disconnected">#F44336</color>
+    <color name="status_pending">#FF9800</color>
+</resources>

@@ -15,13 +15,14 @@ class VoiceHandler(private val context: Context) {
     private var audioPlayer: AudioTrack? = null
     private var isRecording = false
     private var recordingThread: Thread? = null
+    private var recordingCallback: ((ByteArray) -> Unit)? = null
 
     companion object {
         private const val TAG = "VoiceHandler"
         private const val SAMPLE_RATE = 16000
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-        private const val MAX_RECORDING_DURATION_MS = 15000 // 15 seconds
+        private const val MAX_RECORDING_DURATION_MS = 30000 // 30 seconds
         
         private fun getBufferSize(): Int {
             return AudioRecord.getMinBufferSize(
@@ -41,6 +42,8 @@ class VoiceHandler(private val context: Context) {
             return
         }
 
+        recordingCallback = onComplete
+
         try {
             val bufferSize = getBufferSize()
             
@@ -54,6 +57,7 @@ class VoiceHandler(private val context: Context) {
             
             if (audioRecorder?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e(TAG, "AudioRecord not initialized")
+                recordingCallback = null
                 return
             }
             
@@ -63,13 +67,14 @@ class VoiceHandler(private val context: Context) {
             Log.d(TAG, "Recording started")
             
             recordingThread = Thread {
-                recordAudio(bufferSize, onComplete)
+                recordAudio(bufferSize)
             }
             recordingThread?.start()
             
             // Auto-stop after max duration
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 if (isRecording) {
+                    Log.d(TAG, "Auto-stopping recording after max duration")
                     stopRecording()
                 }
             }, MAX_RECORDING_DURATION_MS.toLong())
@@ -77,16 +82,18 @@ class VoiceHandler(private val context: Context) {
         } catch (e: SecurityException) {
             Log.e(TAG, "No permission to record audio", e)
             isRecording = false
+            recordingCallback = null
         } catch (e: Exception) {
             Log.e(TAG, "Error starting recording", e)
             isRecording = false
+            recordingCallback = null
         }
     }
 
     /**
      * Record audio data
      */
-    private fun recordAudio(bufferSize: Int, onComplete: (ByteArray) -> Unit) {
+    private fun recordAudio(bufferSize: Int) {
         val buffer = ByteArray(bufferSize)
         val outputStream = ByteArrayOutputStream()
         
@@ -102,9 +109,12 @@ class VoiceHandler(private val context: Context) {
             val audioData = outputStream.toByteArray()
             Log.d(TAG, "Recording completed: ${audioData.size} bytes")
             
-            // Callback with audio data
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                onComplete(audioData)
+            // Callback with audio data on main thread
+            val callback = recordingCallback
+            if (callback != null && audioData.isNotEmpty()) {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    callback(audioData)
+                }
             }
             
         } catch (e: Exception) {
@@ -120,19 +130,25 @@ class VoiceHandler(private val context: Context) {
     fun stopRecording() {
         if (!isRecording) return
         
+        Log.d(TAG, "Stopping recording...")
         isRecording = false
         
         try {
+            // Give the recording thread a moment to finish
+            Thread.sleep(100)
+            
             audioRecorder?.stop()
             audioRecorder?.release()
             audioRecorder = null
             
-            recordingThread?.join(1000)
+            recordingThread?.join(2000)
             recordingThread = null
             
-            Log.d(TAG, "Recording stopped")
+            Log.d(TAG, "Recording stopped successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping recording", e)
+        } finally {
+            recordingCallback = null
         }
     }
 

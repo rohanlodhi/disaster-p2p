@@ -52,7 +52,7 @@ UI (1):
 | 🌐 **Offline Mesh** | BLE + Wi-Fi Direct, no internet needed |
 | 📍 **GPS Tagging** | Every message includes coordinates |
 | 🚨 **SOS Button** | One-tap emergency broadcast |
-| 🎤 **Voice SMS** | 15-second audio messages |
+| 🎤 **Voice SMS** | 30-second audio messages |
 | 🔁 **Auto Relay** | Messages forward through up to 5 hops |
 | 🔋 **Low Power** | Optimized for extended battery life |
 | 👥 **Dual Roles** | Citizen (user) / Official (responder) |
@@ -116,8 +116,8 @@ cd /home/rohan/Desktop/flame-courses/imp/EmergencyMesh
 
 ### Scenario 4: Voice Message
 ```
-1. Tap "🎤 Record Voice"
-2. Speak for up to 15 seconds
+1. Tap "🎤 Record Voice" button
+2. Speak for up to 30 seconds
 3. Tap "⏹ Stop Recording"
 4. Voice sent to all peers
 5. Recipients tap to play

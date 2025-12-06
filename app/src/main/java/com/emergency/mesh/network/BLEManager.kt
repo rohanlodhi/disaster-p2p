@@ -1,5 +1,6 @@
 package com.emergency.mesh.network
 
+import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
@@ -40,6 +41,9 @@ class BLEManager(private val context: Context) {
 
     private var isAdvertising = false
     private var isScanning = false
+    
+    // Power mode: true = high range, false = power saving
+    private var highRangeMode = true
 
     companion object {
         private const val TAG = "BLEManager"
@@ -58,6 +62,27 @@ class BLEManager(private val context: Context) {
     }
 
     /**
+     * Set power mode for BLE operations
+     * @param highRange true for maximum range (higher battery usage), false for power saving
+     */
+    fun setPowerMode(highRange: Boolean) {
+        if (highRangeMode == highRange) return
+        
+        highRangeMode = highRange
+        Log.d(TAG, "Power mode changed to: ${if (highRange) "High Range" else "Power Saving"}")
+        
+        // Restart advertising and scanning with new settings
+        if (isAdvertising) {
+            stopAdvertising()
+            startAdvertising()
+        }
+        if (isScanning) {
+            stopScanning()
+            startScanning()
+        }
+    }
+
+    /**
      * Start BLE advertising to make device discoverable
      */
     fun startAdvertising() {
@@ -69,11 +94,24 @@ class BLEManager(private val context: Context) {
             return
         }
 
+        // Use different settings based on power mode
+        val advertiseMode = if (highRangeMode) {
+            AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY  // Maximum advertising frequency
+        } else {
+            AdvertiseSettings.ADVERTISE_MODE_LOW_POWER    // Battery saving
+        }
+        
+        val txPowerLevel = if (highRangeMode) {
+            AdvertiseSettings.ADVERTISE_TX_POWER_HIGH     // Maximum range
+        } else {
+            AdvertiseSettings.ADVERTISE_TX_POWER_LOW      // Battery saving
+        }
+
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
+            .setAdvertiseMode(advertiseMode)
             .setConnectable(true)
             .setTimeout(0)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
+            .setTxPowerLevel(txPowerLevel)
             .build()
 
         val data = AdvertiseData.Builder()
@@ -84,7 +122,7 @@ class BLEManager(private val context: Context) {
         try {
             bleAdvertiser?.startAdvertising(settings, data, advertiseCallback)
             isAdvertising = true
-            Log.d(TAG, "BLE advertising started")
+            Log.d(TAG, "BLE advertising started (${if (highRangeMode) "High Range" else "Power Saving"})")
             setupGattServer()
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception starting BLE advertising", e)
@@ -118,8 +156,15 @@ class BLEManager(private val context: Context) {
             return
         }
 
+        // Use different scan mode based on power settings
+        val scanMode = if (highRangeMode) {
+            ScanSettings.SCAN_MODE_LOW_LATENCY  // Scan more frequently for faster discovery
+        } else {
+            ScanSettings.SCAN_MODE_LOW_POWER    // Battery saving
+        }
+
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+            .setScanMode(scanMode)
             .build()
 
         val filter = ScanFilter.Builder()
@@ -129,7 +174,7 @@ class BLEManager(private val context: Context) {
         try {
             bleScanner?.startScan(listOf(filter), settings, scanCallback)
             isScanning = true
-            Log.d(TAG, "BLE scanning started")
+            Log.d(TAG, "BLE scanning started (${if (highRangeMode) "High Range" else "Power Saving"})")
         } catch (e: SecurityException) {
             Log.e(TAG, "Security exception starting BLE scan", e)
         }
@@ -332,6 +377,7 @@ class BLEManager(private val context: Context) {
     }
 
     private val gattClientCallback = object : BluetoothGattCallback() {
+        @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
             val deviceAddress = gatt?.device?.address ?: return
             
@@ -348,6 +394,7 @@ class BLEManager(private val context: Context) {
             }
         }
 
+        @SuppressLint("MissingPermission")
         override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
             val deviceAddress = gatt?.device?.address ?: return
             if (status == BluetoothGatt.GATT_SUCCESS) {

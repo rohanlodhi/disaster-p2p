@@ -1,6 +1,7 @@
 package com.emergency.mesh.services
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
@@ -13,6 +14,7 @@ import com.emergency.mesh.R
 import com.emergency.mesh.handlers.MessageHandler
 import com.emergency.mesh.models.MeshMessage
 import com.emergency.mesh.models.MeshPeer
+import com.emergency.mesh.models.UserRole
 import com.emergency.mesh.network.ConnectionManager
 
 /**
@@ -31,6 +33,7 @@ class MeshService : Service() {
         private const val TAG = "MeshService"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "emergency_mesh_channel"
+        private const val PREF_USER_ROLE = "user_role"
         const val ACTION_SEND_MESSAGE = "com.emergency.mesh.SEND_MESSAGE"
         const val EXTRA_MESSAGE = "message"
     }
@@ -52,6 +55,9 @@ class MeshService : Service() {
         connectionManager = ConnectionManager(this)
         messageHandler = MessageHandler(this)
         
+        // Load user role and set on connection manager
+        loadUserRole()
+        
         // Set up callbacks
         connectionManager.onMessageReceived { message ->
             notifyMessageReceived(message)
@@ -69,6 +75,39 @@ class MeshService : Service() {
         
         // Start as foreground service
         startForeground()
+    }
+
+    /**
+     * Load user role from SharedPreferences and set on ConnectionManager
+     */
+    private fun loadUserRole() {
+        val prefs = getSharedPreferences("emergency_mesh", Context.MODE_PRIVATE)
+        val savedRole = prefs.getString(PREF_USER_ROLE, null)
+        
+        if (savedRole != null) {
+            try {
+                connectionManager.currentUserRole = UserRole.valueOf(savedRole)
+                Log.d(TAG, "User role loaded: ${connectionManager.currentUserRole}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading user role", e)
+            }
+        }
+    }
+
+    /**
+     * Set user role (called from MainActivity when role is selected)
+     */
+    fun setUserRole(role: UserRole) {
+        connectionManager.currentUserRole = role
+        Log.d(TAG, "User role set: $role")
+    }
+
+    /**
+     * Set power mode for BLE operations
+     * @param highRange true for maximum range (higher battery usage), false for power saving
+     */
+    fun setPowerMode(highRange: Boolean) {
+        connectionManager.setPowerMode(highRange)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import com.emergency.mesh.models.MeshMessage
 import com.emergency.mesh.models.MessageType
+import com.emergency.mesh.models.UserProfile
 import java.util.*
 
 /**
@@ -26,6 +27,20 @@ class MessageHandler(private val context: Context) {
     }
 
     /**
+     * Get current user profile
+     */
+    private fun getUserProfile(): UserProfile? {
+        return UserProfile.load(context)
+    }
+
+    /**
+     * Get sender name from profile or default
+     */
+    private fun getSenderName(): String {
+        return getUserProfile()?.name ?: ""
+    }
+
+    /**
      * Create a text message with current GPS coordinates
      */
     fun createTextMessage(text: String, senderId: String): MeshMessage {
@@ -38,7 +53,8 @@ class MessageHandler(private val context: Context) {
             latitude = location?.latitude,
             longitude = location?.longitude,
             timestamp = System.currentTimeMillis(),
-            senderId = senderId
+            senderId = senderId,
+            senderName = getSenderName()
         )
     }
 
@@ -56,15 +72,17 @@ class MessageHandler(private val context: Context) {
             longitude = location?.longitude,
             timestamp = System.currentTimeMillis(),
             senderId = senderId,
+            senderName = getSenderName(),
             audioData = audioData
         )
     }
 
     /**
-     * Create an SOS message with current GPS coordinates
+     * Create an SOS message with current GPS coordinates and user profile
      */
     fun createSOSMessage(senderId: String): MeshMessage {
         val location = getCurrentLocation()
+        val profile = getUserProfile()
         
         val sosContent = if (location != null) {
             "SOS - Emergency at ${location.latitude}, ${location.longitude}"
@@ -79,7 +97,9 @@ class MessageHandler(private val context: Context) {
             latitude = location?.latitude,
             longitude = location?.longitude,
             timestamp = System.currentTimeMillis(),
-            senderId = senderId
+            senderId = senderId,
+            senderName = getSenderName(),
+            senderProfile = profile?.getSOSInfo() ?: ""
         )
     }
 
@@ -152,17 +172,32 @@ class MessageHandler(private val context: Context) {
 
     /**
      * Format message for display
+     * @param isSent Whether this is a message sent by the current user
      */
-    fun formatMessageForDisplay(message: MeshMessage): String {
+    fun formatMessageForDisplay(message: MeshMessage, isSent: Boolean = false): String {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
             .format(Date(message.timestamp))
         
         val location = message.getLocationString()
         
+        // Use sender name if available, otherwise use senderId
+        val senderDisplay = if (message.senderName.isNotBlank()) {
+            message.senderName
+        } else {
+            message.senderId.take(8) // Show first 8 chars of UUID
+        }
+        
+        val prefix = if (isSent) "📤 Sent" else ""
+        
         return when (message.type) {
-            MessageType.SOS -> "🚨 SOS [${message.senderId}]\n$timestamp\n$location\n${message.content}"
-            MessageType.VOICE -> "🎤 Voice [${message.senderId}]\n$timestamp\n$location"
-            MessageType.TEXT -> "[${message.senderId}]\n$timestamp\n$location\n${message.content}"
+            MessageType.SOS -> {
+                val profileInfo = if (message.senderProfile.isNotBlank()) {
+                    "\n${message.senderProfile}"
+                } else ""
+                "$prefix🚨 SOS [$senderDisplay]\n$timestamp\n$location\n${message.content}$profileInfo"
+            }
+            MessageType.VOICE -> "$prefix🎤 Voice [$senderDisplay]\n$timestamp\n$location\n(Tap to play)"
+            MessageType.TEXT -> "$prefix[$senderDisplay]\n$timestamp\n$location\n${message.content}"
         }
     }
 }

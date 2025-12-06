@@ -10,18 +10,25 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.emergency.mesh.adapters.MessageAdapter
 import com.emergency.mesh.handlers.MessageHandler
 import com.emergency.mesh.handlers.VoiceHandler
 import com.emergency.mesh.models.MeshMessage
 import com.emergency.mesh.models.MeshPeer
+import com.emergency.mesh.models.MessageType
+import com.emergency.mesh.models.UserProfile
 import com.emergency.mesh.models.UserRole
 import com.emergency.mesh.services.MeshService
+import com.google.android.material.switchmaterial.SwitchMaterial
 import java.util.*
 
 /**
@@ -31,6 +38,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var userRole: UserRole
     private lateinit var deviceId: String
+    private var userProfile: UserProfile? = null
     
     private var meshService: MeshService? = null
     private var serviceBound = false
@@ -41,20 +49,24 @@ class MainActivity : AppCompatActivity() {
     // UI components
     private lateinit var tvStatus: TextView
     private lateinit var tvPeerCount: TextView
-    private lateinit var btnSOS: Button
-    private lateinit var btnSendText: Button
-    private lateinit var btnRecordVoice: Button
+    private lateinit var btnSOS: View
+    private lateinit var btnSendText: ImageButton
+    private lateinit var btnRecordVoice: ImageButton
     private lateinit var etMessage: EditText
-    private lateinit var lvMessages: ListView
-    private lateinit var messagesAdapter: ArrayAdapter<String>
+    private lateinit var rvMessages: RecyclerView
+    private lateinit var switchPowerMode: SwitchMaterial
+    private lateinit var messageAdapter: MessageAdapter
     
-    private val receivedMessages = mutableListOf<String>()
-
+    // Track recording state
+    private var isRecording = false
+    
     companion object {
         private const val TAG = "MainActivity"
         private const val PERMISSIONS_REQUEST_CODE = 100
         private const val PREF_USER_ROLE = "user_role"
         private const val PREF_DEVICE_ID = "device_id"
+        private const val MAX_STORED_MESSAGES = 50
+        private const val MAX_VOICE_MESSAGES = 20
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,9 +76,62 @@ class MainActivity : AppCompatActivity() {
         messageHandler = MessageHandler(this)
         voiceHandler = VoiceHandler(this)
         
-        // Load or select user role
-        loadOrSelectUserRole()
+        // Check if user registration is needed
+        if (!UserProfile.exists(this)) {
+            showRegistrationDialog {
+                // After registration, proceed with role selection
+                loadOrSelectUserRole()
+            }
+        } else {
+            userProfile = UserProfile.load(this)
+            loadOrSelectUserRole()
+        }
+    }
+
+    /**
+     * Show user registration dialog on first launch
+     */
+    private fun showRegistrationDialog(onComplete: () -> Unit) {
+        val dialogView: View = LayoutInflater.from(this).inflate(R.layout.dialog_registration, null)
         
+        val etName = dialogView.findViewById<EditText>(R.id.etName)
+        val etPhone = dialogView.findViewById<EditText>(R.id.etPhone)
+        val etEmergencyContact = dialogView.findViewById<EditText>(R.id.etEmergencyContact)
+        val etBloodType = dialogView.findViewById<EditText>(R.id.etBloodType)
+        val etMedicalInfo = dialogView.findViewById<EditText>(R.id.etMedicalInfo)
+        
+        AlertDialog.Builder(this)
+            .setTitle("User Registration")
+            .setMessage("Please provide your information for emergency situations")
+            .setView(dialogView)
+            .setPositiveButton("Register") { dialog, _ ->
+                val name = etName.text.toString().trim()
+                
+                if (name.isBlank()) {
+                    Toast.makeText(this, "Name is required", Toast.LENGTH_SHORT).show()
+                    showRegistrationDialog(onComplete)
+                    return@setPositiveButton
+                }
+                
+                val profile = UserProfile(
+                    name = name,
+                    phone = etPhone.text.toString().trim(),
+                    emergencyContact = etEmergencyContact.text.toString().trim(),
+                    bloodType = etBloodType.text.toString().trim(),
+                    medicalInfo = etMedicalInfo.text.toString().trim()
+                )
+                
+                UserProfile.save(this, profile)
+                userProfile = profile
+                
+                Toast.makeText(this, "Registration complete", Toast.LENGTH_SHORT).show()
+                onComplete()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun continueSetup() {
         // Set up UI
         setupUI()
         
@@ -77,7 +142,9 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         // Bind to mesh service
-        bindMeshService()
+        if (::userRole.isInitialized) {
+            bindMeshService()
+        }
     }
 
     override fun onStop() {
@@ -104,30 +171,45 @@ class MainActivity : AppCompatActivity() {
         btnSendText = findViewById(R.id.btnSendText)
         btnRecordVoice = findViewById(R.id.btnRecordVoice)
         etMessage = findViewById(R.id.etMessage)
-        lvMessages = findViewById(R.id.lvMessages)
+        rvMessages = findViewById(R.id.rvMessages)
+        switchPowerMode = findViewById(R.id.switchPowerMode)
         
-        // Set up messages list
-        messagesAdapter = ArrayAdapter(this, R.layout.list_item_message, android.R.id.text1, receivedMessages)
-        lvMessages.adapter = messagesAdapter
+        // Set up RecyclerView with adapter
+        messageAdapter = MessageAdapter(this) { message ->
+            // Voice message click handler
+            if (message.audioData != null) {
+                Toast.makeText(this, "Playing voice message...", Toast.LENGTH_SHORT).show()
+                voiceHandler.playAudio(message.audioData)
+            }
+        }
+        
+        val layoutManager = LinearLayoutManager(this)
+        layoutManager.stackFromEnd = true // New messages appear at bottom
+        rvMessages.layoutManager = layoutManager
+        rvMessages.adapter = messageAdapter
         
         // Set up button listeners
         btnSOS.setOnClickListener { sendSOS() }
         btnSendText.setOnClickListener { sendTextMessage() }
         
         btnRecordVoice.setOnClickListener {
-            if (voiceHandler.isRecording()) {
+            if (isRecording) {
                 voiceHandler.stopRecording()
-                btnRecordVoice.text = "🎤 Record Voice"
+                isRecording = false
+                btnRecordVoice.setImageResource(android.R.drawable.ic_btn_speak_now)
             } else {
                 startVoiceRecording()
-                btnRecordVoice.text = "⏹ Stop Recording"
+                isRecording = true
+                btnRecordVoice.setImageResource(android.R.drawable.ic_media_pause)
             }
         }
         
-        // Play voice message on item click
-        lvMessages.setOnItemClickListener { _, _, position, _ ->
-            // In real implementation, would store and play voice messages
-            Toast.makeText(this, "Message clicked", Toast.LENGTH_SHORT).show()
+        // Power mode toggle (High Range vs Power Saving)
+        switchPowerMode.isChecked = true // Default to high range
+        switchPowerMode.setOnCheckedChangeListener { _, isChecked ->
+            val mode = if (isChecked) "High Range" else "Power Saving"
+            Toast.makeText(this, "Mode: $mode", Toast.LENGTH_SHORT).show()
+            meshService?.setPowerMode(isChecked)
         }
         
         updateStatus("Initializing...")
@@ -144,6 +226,7 @@ class MainActivity : AppCompatActivity() {
             userRole = UserRole.valueOf(savedRole)
             deviceId = prefs.getString(PREF_DEVICE_ID, UUID.randomUUID().toString())
                 ?: UUID.randomUUID().toString()
+            continueSetup()
         } else {
             // Show role selection dialog
             showRoleSelectionDialog()
@@ -170,6 +253,7 @@ class MainActivity : AppCompatActivity() {
                     .apply()
                 
                 Toast.makeText(this, "Role: ${userRole.name}", Toast.LENGTH_SHORT).show()
+                continueSetup()
             }
             .setCancelable(false)
             .show()
@@ -184,10 +268,7 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.BLUETOOTH,
-            Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.ACCESS_WIFI_STATE,
-            Manifest.permission.CHANGE_WIFI_STATE,
-            Manifest.permission.CHANGE_NETWORK_STATE
+            Manifest.permission.BLUETOOTH_ADMIN
         )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -197,7 +278,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
@@ -277,6 +357,11 @@ class MainActivity : AppCompatActivity() {
             meshService = binder.getService()
             serviceBound = true
             
+            // Set user role on service
+            if (::userRole.isInitialized) {
+                meshService?.setUserRole(userRole)
+            }
+            
             meshService?.registerCallback(serviceCallback)
             updateStatus("Connected to mesh network")
             
@@ -300,21 +385,7 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "Activity received message: ${message.id}. Current role: $userRole")
             runOnUiThread {
                 try {
-                    val formattedMessage = messageHandler.formatMessageForDisplay(message)
-                    receivedMessages.add(0, formattedMessage)
-                    
-                    // Limit messages list
-                    if (receivedMessages.size > 50) {
-                        receivedMessages.removeAt(receivedMessages.size - 1)
-                    }
-                    
-                    messagesAdapter.notifyDataSetChanged()
-                    Log.d(TAG, "UI updated with message: ${message.id}")
-                    
-                    // Play voice message if applicable
-                    if (message.type == com.emergency.mesh.models.MessageType.VOICE && message.audioData != null) {
-                        voiceHandler.playAudio(message.audioData)
-                    }
+                    addMessageToList(message, isSent = false)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating UI with message", e)
                 }
@@ -323,9 +394,22 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPeersUpdated(peers: List<MeshPeer>) {
             runOnUiThread {
-                tvPeerCount.text = "Peers: ${peers.size}"
+                tvPeerCount.text = "👥 ${peers.size} peer${if (peers.size != 1) "s" else ""}"
             }
         }
+    }
+
+    /**
+     * Add a message to the display list
+     */
+    private fun addMessageToList(message: MeshMessage, isSent: Boolean) {
+        messageAdapter.addMessage(message, isSent)
+        messageAdapter.trimToSize(MAX_STORED_MESSAGES)
+        
+        // Scroll to bottom to show new message
+        rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
+        
+        Log.d(TAG, "UI updated with message: ${message.id}, isSent: $isSent")
     }
 
     /**
@@ -334,6 +418,9 @@ class MainActivity : AppCompatActivity() {
     private fun sendSOS() {
         val sosMessage = messageHandler.createSOSMessage(deviceId)
         meshService?.sendMessage(sosMessage)
+        
+        // Display sent message in UI
+        addMessageToList(sosMessage, isSent = true)
         
         Toast.makeText(this, "🚨 SOS Sent", Toast.LENGTH_SHORT).show()
         updateStatus("SOS broadcast sent")
@@ -353,6 +440,9 @@ class MainActivity : AppCompatActivity() {
         val textMessage = messageHandler.createTextMessage(text, deviceId)
         meshService?.sendMessage(textMessage)
         
+        // Display sent message in UI
+        addMessageToList(textMessage, isSent = true)
+        
         etMessage.setText("")
         Toast.makeText(this, "Message sent", Toast.LENGTH_SHORT).show()
     }
@@ -363,11 +453,15 @@ class MainActivity : AppCompatActivity() {
     private fun startVoiceRecording() {
         voiceHandler.startRecording { audioData ->
             runOnUiThread {
-                btnRecordVoice.text = "🎤 Record Voice"
+                isRecording = false
+                btnRecordVoice.setImageResource(android.R.drawable.ic_btn_speak_now)
                 
                 if (audioData.isNotEmpty()) {
                     val voiceMessage = messageHandler.createVoiceMessage(audioData, deviceId)
                     meshService?.sendMessage(voiceMessage)
+                    
+                    // Display sent message in UI
+                    addMessageToList(voiceMessage, isSent = true)
                     
                     Toast.makeText(this, "Voice message sent", Toast.LENGTH_SHORT).show()
                 }

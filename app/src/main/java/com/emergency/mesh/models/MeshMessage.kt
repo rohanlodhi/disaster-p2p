@@ -22,9 +22,16 @@ data class MeshMessage(
     val longitude: Double?,
     val timestamp: Long,
     val senderId: String,
+    val senderName: String = "",
+    val senderProfile: String = "", // Serialized UserProfile info for SOS
     val hops: Int = 0,
     val audioData: ByteArray? = null
 ) : Serializable {
+
+    companion object {
+        private const val serialVersionUID = 2L // Version 2 with senderName/senderProfile
+        const val DISPLAY_MAX_HOPS = 5 // Max hops for citizen visibility
+    }
 
     /**
      * Get formatted location string
@@ -45,10 +52,21 @@ data class MeshMessage(
     }
 
     /**
-     * Check if message has exceeded maximum hops
+     * Check if message should be displayed based on user role
+     * - Citizens only see messages within 5 hops
+     * - Officials see all messages regardless of hop count
+     */
+    fun shouldDisplayForRole(role: UserRole): Boolean {
+        return hops <= DISPLAY_MAX_HOPS || role == UserRole.OFFICIAL
+    }
+
+    /**
+     * Messages are always relayed (no hop limit for relay)
+     * Returning false means this message should still be relayed
      */
     fun hasExceededMaxHops(): Boolean {
-        return hops >= MAX_HOPS
+        // Always return false - unlimited relay
+        return false
     }
 
     override fun equals(other: Any?): Boolean {
@@ -64,9 +82,5 @@ data class MeshMessage(
 
     override fun hashCode(): Int {
         return id.hashCode()
-    }
-
-    companion object {
-        const val MAX_HOPS = 5 // Prevent infinite relay loops
     }
 }
