@@ -45,6 +45,7 @@ class MessageHandler(private val context: Context) {
      */
     fun createTextMessage(text: String, senderId: String): MeshMessage {
         val location = getCurrentLocation()
+        val profile = getUserProfile()
         
         return MeshMessage(
             id = UUID.randomUUID().toString(),
@@ -54,7 +55,8 @@ class MessageHandler(private val context: Context) {
             longitude = location?.longitude,
             timestamp = System.currentTimeMillis(),
             senderId = senderId,
-            senderName = getSenderName()
+            senderName = getSenderName(),
+            senderProfile = profile?.getSOSInfo() ?: ""
         )
     }
 
@@ -63,6 +65,7 @@ class MessageHandler(private val context: Context) {
      */
     fun createVoiceMessage(audioData: ByteArray, senderId: String): MeshMessage {
         val location = getCurrentLocation()
+        val profile = getUserProfile()
         
         return MeshMessage(
             id = UUID.randomUUID().toString(),
@@ -73,6 +76,7 @@ class MessageHandler(private val context: Context) {
             timestamp = System.currentTimeMillis(),
             senderId = senderId,
             senderName = getSenderName(),
+            senderProfile = profile?.getSOSInfo() ?: "",
             audioData = audioData
         )
     }
@@ -94,6 +98,36 @@ class MessageHandler(private val context: Context) {
             id = UUID.randomUUID().toString(),
             type = MessageType.SOS,
             content = sosContent,
+            latitude = location?.latitude,
+            longitude = location?.longitude,
+            timestamp = System.currentTimeMillis(),
+            senderId = senderId,
+            senderName = getSenderName(),
+            senderProfile = profile?.getSOSInfo() ?: ""
+        )
+    }
+
+    /**
+     * Create a SAFE status message with current GPS coordinates
+     */
+    fun createSafeMessage(senderId: String, isSafe: Boolean): MeshMessage {
+        val location = getCurrentLocation()
+        val profile = getUserProfile()
+        
+        val safeContent = if (isSafe) {
+            if (location != null) {
+                "I am SAFE at ${String.format("%.4f", location.latitude)}, ${String.format("%.4f", location.longitude)}"
+            } else {
+                "I am SAFE"
+            }
+        } else {
+            "Status cleared"
+        }
+        
+        return MeshMessage(
+            id = UUID.randomUUID().toString(),
+            type = MessageType.SAFE,
+            content = safeContent,
             latitude = location?.latitude,
             longitude = location?.longitude,
             timestamp = System.currentTimeMillis(),
@@ -196,6 +230,7 @@ class MessageHandler(private val context: Context) {
                 } else ""
                 "$prefix🚨 SOS [$senderDisplay]\n$timestamp\n$location\n${message.content}$profileInfo"
             }
+            MessageType.SAFE -> "$prefix✅ SAFE [$senderDisplay]\n$timestamp\n$location\n${message.content}"
             MessageType.VOICE -> "$prefix🎤 Voice [$senderDisplay]\n$timestamp\n$location\n(Tap to play)"
             MessageType.TEXT -> "$prefix[$senderDisplay]\n$timestamp\n$location\n${message.content}"
         }

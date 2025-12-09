@@ -8,7 +8,8 @@ import java.io.Serializable
 enum class MessageType {
     TEXT,
     VOICE,
-    SOS
+    SOS,
+    SAFE
 }
 
 /**

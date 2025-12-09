@@ -1,204 +1,69 @@
-# Emergency Mesh - Offline Emergency Communication System
+# Emergency Mesh - v1.0
 
-A barebones, decentralized Android application for emergency communication in disaster scenarios without internet connectivity.
+Emergency Mesh is an offline communication app for Android. It helps people stay connected during disasters when cell service and internet are down. It uses Bluetooth Low Energy (BLE) to create a local network between devices, allowing messages to hop from one phone to another.
 
-## Features
+## What's New in v1.0
 
-### Core Functionality
-- **Offline Mesh Networking**: Uses Wi-Fi Direct and Bluetooth Low Energy (BLE) for peer-to-peer communication
-- **Automatic Peer Discovery**: Discovers nearby devices and forms ad-hoc mesh network
-- **Message Relay**: Automatically relays messages through peers to extend network range
-- **GPS Coordinates**: Every message includes sender's GPS coordinates
-- **Emergency SOS**: One-tap SOS broadcast with location
-- **Voice Messages**: Record and send short voice messages (≤15 seconds)
-- **Two User Roles**: Citizen mode (send SOS, messages) and Official mode (view SOS on map)
+This is the first major release of the application, featuring a complete redesign and new safety features.
 
-### Power Optimization
-- Low-power BLE advertising and scanning cycles
-- Lightweight Wi-Fi Direct connections
-- Auto-disconnect after message delivery
-- Foreground service with minimal battery impact
-- Automatic cleanup of temporary audio files
+*   **Professional UI**: A clean, three-tab interface (Home, Chat, Profile) that's easy to use in stressful situations.
+*   **"I Am Safe" Status**: Quickly broadcast your safety status to everyone nearby.
+*   **Language Support**: Full support for English, Hindi, Tamil, Telugu, and Bengali.
+*   **Voice Messaging**: Send 30-second voice notes when typing isn't possible.
+*   **Smart Navigation**: Integrated Google Maps support for location sharing.
 
-## Architecture
+## Key Features
 
-### Modular Components
+### 📡 Offline Communication
+*   **No Internet Required**: Works entirely over Bluetooth.
+*   **Mesh Networking**: Messages relay through other devices to extend range.
+*   **Auto-Discovery**: Automatically finds and connects to nearby users.
 
-1. **ConnectionManager** (`network/ConnectionManager.kt`)
-   - Unified interface for BLE and Wi-Fi Direct
-   - Handles peer discovery and message routing
-   - Prevents message loops with hop count and seen message cache
+### 🚨 Emergency Tools
+*   **SOS Button**: One-tap distress signal that alerts all nearby users.
+*   **Location Tagging**: Every message and SOS includes your GPS coordinates.
+*   **Safe Status**: Let others know you're okay with a single tap.
+*   **Quick Messages**: Pre-set emergency messages (Need Water, Need Medical, etc.) for fast communication.
 
-2. **BLEManager** (`network/BLEManager.kt`)
-   - Manages Bluetooth Low Energy advertising and scanning
-   - GATT server for incoming connections
-   - Low-power operation modes
+### 💬 Chat & Voice
+*   **Text Messaging**: Private and public messaging within the mesh.
+*   **Voice Notes**: Record and send audio messages.
+*   **Message History**: View past conversations and alerts.
 
-3. **WiFiDirectManager** (`network/WiFiDirectManager.kt`)
-   - Handles Wi-Fi Direct peer discovery
-   - Creates P2P groups for higher bandwidth
-   - Socket-based message transmission
+### 🌍 Localization
+*   **Multi-Language**: Switch instantly between 5 supported languages.
+*   **Localized Interface**: All menus, buttons, and alerts are translated.
 
-4. **MessageHandler** (`handlers/MessageHandler.kt`)
-   - Creates messages with GPS coordinates
-   - Location service integration
-   - Message formatting for display
+## How to Use
 
-5. **VoiceHandler** (`handlers/VoiceHandler.kt`)
-   - Records audio messages (max 15 seconds)
-   - Plays received voice messages
-   - Automatic cleanup to save storage
+### 1. Home Tab
+*   **Check Status**: See how many devices are connected nearby.
+*   **SOS**: Press the big red button to send an emergency alert.
+*   **Safe Mode**: Tap "I Am Safe" to broadcast your status.
+*   **Quick Actions**: Use the grid buttons for common needs like water or shelter.
 
-6. **MeshService** (`services/MeshService.kt`)
-   - Foreground service keeps mesh network running
-   - Background message relay
-   - SOS notifications
+### 2. Chat Tab
+*   **Communicate**: Send text or voice messages to the network.
+*   **View Alerts**: See SOS and Safe status updates from others.
+*   **Play Voice**: Tap any voice bubble to listen to the message.
 
-## Technical Requirements
+### 3. Profile Tab
+*   **Personal Info**: Enter your name, blood type, and emergency contacts.
+*   **Settings**: Change the app language or your user role (Citizen/Official).
 
-- **Minimum SDK**: 26 (Android 8.0)
-- **Target SDK**: 34 (Android 14)
-- **Language**: Kotlin
-- **Required Hardware**: 
-  - Bluetooth Low Energy
-  - Wi-Fi Direct (optional but recommended)
-  - GPS (optional, falls back gracefully)
+## Technical Details
 
-## Permissions
+*   **Minimum Android Version**: Android 8.0 (Oreo)
+*   **Target Android Version**: Android 14
+*   **Technology**: Bluetooth Low Energy (BLE)
+*   **Permissions**: Bluetooth, Location (for scanning), Audio (for voice notes). **No internet permission used.**
 
-The app requires the following permissions:
-- `BLUETOOTH`, `BLUETOOTH_ADMIN` - For BLE operations
-- `BLUETOOTH_SCAN`, `BLUETOOTH_ADVERTISE`, `BLUETOOTH_CONNECT` - Android 12+
-- `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` - Required for BLE/Wi-Fi Direct scanning
-- `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE` - For Wi-Fi Direct
-- `RECORD_AUDIO` - For voice messages
-- `FOREGROUND_SERVICE` - Keep mesh running in background
-- `POST_NOTIFICATIONS` - For SOS alerts
+## Installation
 
-**Note**: No internet permission is required or used.
-
-## Usage
-
-### First Launch
-1. Select your role: **Citizen** or **Official**
-2. Grant required permissions
-3. Mesh network starts automatically
-
-### Citizen Mode
-- **Send SOS**: Tap red emergency button to broadcast SOS with location
-- **Send Text**: Type message and tap SEND
-- **Voice Message**: Press "Record Voice", speak (max 30s), press again to send
-- **View Messages**: Scroll through received messages with coordinates
-
-### Official Mode
-- View all SOS requests with locations
-- Send response messages
-- Monitor active peers
-
-## Message Format
-
-Every message includes:
-```
-[Sender ID]
-HH:MM:SS (timestamp)
-Lat: XX.XXXXXX, Lon: YY.YYYYYY
-Message content
-```
-
-If GPS is unavailable: `Location not available`
-
-## Mesh Behavior
-
-- Messages are automatically relayed up to 5 hops
-- Duplicate messages are filtered using message ID cache
-- Peer timeout: 1 minute of inactivity
-- Message cache: 5 minutes
-
-## Power Optimization Strategy
-
-1. **BLE**: Low-power advertising mode with 30-second intervals
-2. **Wi-Fi Direct**: Connections closed after message delivery
-3. **Location**: Uses last known location, no continuous tracking
-4. **Audio**: Immediate cleanup after sending voice messages
-5. **Service**: Runs as foreground service, system manages lifecycle
-
-## Building the Project
-
-### Prerequisites
-- Android Studio Hedgehog or later
-- JDK 8 or higher
-- Android SDK 34
-
-### Build Steps
-```bash
-cd EmergencyMesh
-./gradlew build
-```
-
-### Install on Device
-```bash
-./gradlew installDebug
-```
-
-## Testing
-
-### Testing Mesh Network
-1. Install on 2+ devices
-2. Grant all permissions on each device
-3. Devices should auto-discover each other
-4. Send messages - they should appear on all devices
-5. Turn off one device and send from another - messages relay through mesh
-
-### Testing Range Extension
-1. Place 3 devices: A -- B -- C (where A and C can't reach each other directly)
-2. Send message from A - should reach C via B (relay)
-3. Check message shows hop count
-
-## Limitations
-
-- No encryption or authentication (by design for simplicity)
-- No persistent message storage
-- Limited to nearby devices (BLE: ~50m, Wi-Fi Direct: ~100m)
-- Voice messages limited to 15 seconds
-- Maximum 5 hops to prevent network congestion
-
-## Future Enhancements (Out of Scope)
-
-- End-to-end encryption
-- Offline maps for SOS visualization
-- Message priority queuing
-- Battery level sharing
-- Group messaging
-
-## License
-
-This is a demonstration/educational project for emergency communication scenarios.
-
-## Safety Notice
-
-This app is designed for emergency scenarios where traditional communication infrastructure is unavailable. It should complement, not replace, official emergency services.
-
-## Technical Notes
-
-### Why BLE + Wi-Fi Direct?
-- **BLE**: Low power, good for discovery and small messages
-- **Wi-Fi Direct**: Higher bandwidth for voice messages and faster relay
-- **Both**: Redundancy and reliability
-
-### Message Serialization
-Messages are serialized using Java's `ObjectOutputStream` for simplicity. In production, use Protocol Buffers or similar for efficiency.
-
-### Location Accuracy
-Uses `getLastKnownLocation()` to avoid battery drain from continuous GPS tracking. In emergency scenarios, approximate location is sufficient.
-
-## Contributing
-
-This is a barebones implementation focused on core functionality. Contributions should maintain:
-- Simplicity and minimal dependencies
-- Low power consumption
-- Offline-first design
-- No internet connectivity
+1.  Download the APK.
+2.  Install on your Android device.
+3.  Grant the required permissions (Bluetooth and Location are essential for mesh networking).
+4.  Create your profile and you're ready to go.
 
 ---
-
-**Built for disaster scenarios where every connection matters.**
+*Built for resilience. Designed for people.*

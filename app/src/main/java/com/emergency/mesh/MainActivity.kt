@@ -6,67 +6,69 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
-import android.widget.*
+import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.emergency.mesh.adapters.MessageAdapter
+import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.ui.setupWithNavController
 import com.emergency.mesh.handlers.MessageHandler
 import com.emergency.mesh.handlers.VoiceHandler
 import com.emergency.mesh.models.MeshMessage
 import com.emergency.mesh.models.MeshPeer
-import com.emergency.mesh.models.MessageType
 import com.emergency.mesh.models.UserProfile
 import com.emergency.mesh.models.UserRole
 import com.emergency.mesh.services.MeshService
-import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import java.util.*
 
 /**
- * Main activity with simple UI for emergency mesh communication
+ * Main activity with navigation-based UI for emergency mesh communication
  */
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var userRole: UserRole
-    private lateinit var deviceId: String
-    private var userProfile: UserProfile? = null
+    lateinit var userRole: UserRole
+        private set
+    lateinit var deviceId: String
+        private set
+    var userProfile: UserProfile? = null
+        private set
     
-    private var meshService: MeshService? = null
+    var meshService: MeshService? = null
+        private set
     private var serviceBound = false
     
-    private lateinit var messageHandler: MessageHandler
-    private lateinit var voiceHandler: VoiceHandler
+    lateinit var messageHandler: MessageHandler
+        private set
+    lateinit var voiceHandler: VoiceHandler
+        private set
     
-    // UI components
-    private lateinit var tvStatus: TextView
-    private lateinit var tvPeerCount: TextView
-    private lateinit var btnSOS: View
-    private lateinit var btnSendText: ImageButton
-    private lateinit var btnRecordVoice: ImageButton
-    private lateinit var etMessage: EditText
-    private lateinit var rvMessages: RecyclerView
-    private lateinit var switchPowerMode: SwitchMaterial
-    private lateinit var messageAdapter: MessageAdapter
+    // Callbacks for fragments
+    private val messageCallbacks = mutableListOf<(MeshMessage) -> Unit>()
+    private val peerCallbacks = mutableListOf<(List<MeshPeer>) -> Unit>()
     
-    // Track recording state
-    private var isRecording = false
+    // Current state
+    private var currentPeers: List<MeshPeer> = emptyList()
+    private var isSafeStatusSet = false
+    private val safePeerIds = mutableSetOf<String>()
+    private val messageHistory = mutableListOf<MeshMessage>()
     
     companion object {
         private const val TAG = "MainActivity"
         private const val PERMISSIONS_REQUEST_CODE = 100
         private const val PREF_USER_ROLE = "user_role"
         private const val PREF_DEVICE_ID = "device_id"
-        private const val MAX_STORED_MESSAGES = 50
-        private const val MAX_VOICE_MESSAGES = 20
+        private const val PREF_LANGUAGE = "language"
+        private const val PREF_SAFE_STATUS = "safe_status"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,7 +81,6 @@ class MainActivity : AppCompatActivity() {
         // Check if user registration is needed
         if (!UserProfile.exists(this)) {
             showRegistrationDialog {
-                // After registration, proceed with role selection
                 loadOrSelectUserRole()
             }
         } else {
@@ -101,14 +102,13 @@ class MainActivity : AppCompatActivity() {
         val etMedicalInfo = dialogView.findViewById<EditText>(R.id.etMedicalInfo)
         
         AlertDialog.Builder(this)
-            .setTitle("User Registration")
-            .setMessage("Please provide your information for emergency situations")
+            .setTitle(R.string.personal_info)
             .setView(dialogView)
-            .setPositiveButton("Register") { dialog, _ ->
+            .setPositiveButton(R.string.save_profile) { _, _ ->
                 val name = etName.text.toString().trim()
                 
                 if (name.isBlank()) {
-                    Toast.makeText(this, "Name is required", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.name_required, Toast.LENGTH_SHORT).show()
                     showRegistrationDialog(onComplete)
                     return@setPositiveButton
                 }
@@ -124,95 +124,11 @@ class MainActivity : AppCompatActivity() {
                 UserProfile.save(this, profile)
                 userProfile = profile
                 
-                Toast.makeText(this, "Registration complete", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.registration_complete, Toast.LENGTH_SHORT).show()
                 onComplete()
             }
             .setCancelable(false)
             .show()
-    }
-
-    private fun continueSetup() {
-        // Set up UI
-        setupUI()
-        
-        // Request permissions
-        requestPermissions()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        // Bind to mesh service
-        if (::userRole.isInitialized) {
-            bindMeshService()
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        // Unbind from service
-        unbindMeshService()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        voiceHandler.cleanup()
-    }
-
-    /**
-     * Set up UI based on user role
-     */
-    private fun setupUI() {
-        setContentView(R.layout.activity_main)
-        
-        // Initialize views
-        tvStatus = findViewById(R.id.tvStatus)
-        tvPeerCount = findViewById(R.id.tvPeerCount)
-        btnSOS = findViewById(R.id.btnSOS)
-        btnSendText = findViewById(R.id.btnSendText)
-        btnRecordVoice = findViewById(R.id.btnRecordVoice)
-        etMessage = findViewById(R.id.etMessage)
-        rvMessages = findViewById(R.id.rvMessages)
-        switchPowerMode = findViewById(R.id.switchPowerMode)
-        
-        // Set up RecyclerView with adapter
-        messageAdapter = MessageAdapter(this) { message ->
-            // Voice message click handler
-            if (message.audioData != null) {
-                Toast.makeText(this, "Playing voice message...", Toast.LENGTH_SHORT).show()
-                voiceHandler.playAudio(message.audioData)
-            }
-        }
-        
-        val layoutManager = LinearLayoutManager(this)
-        layoutManager.stackFromEnd = true // New messages appear at bottom
-        rvMessages.layoutManager = layoutManager
-        rvMessages.adapter = messageAdapter
-        
-        // Set up button listeners
-        btnSOS.setOnClickListener { sendSOS() }
-        btnSendText.setOnClickListener { sendTextMessage() }
-        
-        btnRecordVoice.setOnClickListener {
-            if (isRecording) {
-                voiceHandler.stopRecording()
-                isRecording = false
-                btnRecordVoice.setImageResource(android.R.drawable.ic_btn_speak_now)
-            } else {
-                startVoiceRecording()
-                isRecording = true
-                btnRecordVoice.setImageResource(android.R.drawable.ic_media_pause)
-            }
-        }
-        
-        // Power mode toggle (High Range vs Power Saving)
-        switchPowerMode.isChecked = true // Default to high range
-        switchPowerMode.setOnCheckedChangeListener { _, isChecked ->
-            val mode = if (isChecked) "High Range" else "Power Saving"
-            Toast.makeText(this, "Mode: $mode", Toast.LENGTH_SHORT).show()
-            meshService?.setPowerMode(isChecked)
-        }
-        
-        updateStatus("Initializing...")
     }
 
     /**
@@ -226,9 +142,9 @@ class MainActivity : AppCompatActivity() {
             userRole = UserRole.valueOf(savedRole)
             deviceId = prefs.getString(PREF_DEVICE_ID, UUID.randomUUID().toString())
                 ?: UUID.randomUUID().toString()
+            isSafeStatusSet = prefs.getBoolean(PREF_SAFE_STATUS, false)
             continueSetup()
         } else {
-            // Show role selection dialog
             showRoleSelectionDialog()
         }
     }
@@ -237,26 +153,39 @@ class MainActivity : AppCompatActivity() {
      * Show role selection dialog
      */
     private fun showRoleSelectionDialog() {
-        val roles = arrayOf("Citizen", "Official")
+        val roles = arrayOf(getString(R.string.role_citizen), getString(R.string.role_official))
         
         AlertDialog.Builder(this)
-            .setTitle("Select Your Role")
+            .setTitle(R.string.select_role)
             .setItems(roles) { _, which ->
                 userRole = if (which == 0) UserRole.CITIZEN else UserRole.OFFICIAL
                 deviceId = UUID.randomUUID().toString()
                 
-                // Save selection
                 val prefs = getSharedPreferences("emergency_mesh", Context.MODE_PRIVATE)
                 prefs.edit()
                     .putString(PREF_USER_ROLE, userRole.name)
                     .putString(PREF_DEVICE_ID, deviceId)
                     .apply()
                 
-                Toast.makeText(this, "Role: ${userRole.name}", Toast.LENGTH_SHORT).show()
                 continueSetup()
             }
             .setCancelable(false)
             .show()
+    }
+
+    private fun continueSetup() {
+        setContentView(R.layout.activity_main)
+        setupNavigation()
+        requestPermissions()
+    }
+
+    private fun setupNavigation() {
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+        val navController = navHostFragment.navController
+        
+        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        bottomNav.setupWithNavController(navController)
     }
 
     /**
@@ -309,9 +238,26 @@ class MainActivity : AppCompatActivity() {
             if (allGranted) {
                 startMeshService()
             } else {
-                Toast.makeText(this, "Permissions required for mesh network", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, R.string.permissions_required, Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (::userRole.isInitialized) {
+            bindMeshService()
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unbindMeshService()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        voiceHandler.cleanup()
     }
 
     /**
@@ -325,8 +271,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             startService(intent)
         }
-        
-        updateStatus("Service started")
     }
 
     /**
@@ -348,22 +292,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Service connection
-     */
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as MeshService.MeshBinder
             meshService = binder.getService()
             serviceBound = true
             
-            // Set user role on service
             if (::userRole.isInitialized) {
                 meshService?.setUserRole(userRole)
             }
             
             meshService?.registerCallback(serviceCallback)
-            updateStatus("Connected to mesh network")
+            
+            // Re-broadcast safe status if set
+            if (isSafeStatusSet) {
+                 val message = messageHandler.createSafeMessage(deviceId, true)
+                 meshService?.sendMessage(message)
+            }
             
             Log.d(TAG, "Service connected")
         }
@@ -371,108 +316,116 @@ class MainActivity : AppCompatActivity() {
         override fun onServiceDisconnected(name: ComponentName?) {
             meshService = null
             serviceBound = false
-            updateStatus("Disconnected from mesh network")
-            
             Log.d(TAG, "Service disconnected")
         }
     }
 
-    /**
-     * Service callback
-     */
     private val serviceCallback = object : MeshService.MeshServiceCallback {
         override fun onMessageReceived(message: MeshMessage) {
-            Log.d(TAG, "Activity received message: ${message.id}. Current role: $userRole")
-            runOnUiThread {
-                try {
-                    addMessageToList(message, isSent = false)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error updating UI with message", e)
+            // Add to history
+            messageHistory.add(message)
+            
+            if (message.type == com.emergency.mesh.models.MessageType.SAFE) {
+                if (message.content == "Status cleared") {
+                    safePeerIds.remove(message.senderId)
+                } else {
+                    safePeerIds.add(message.senderId)
                 }
+                // Notify peers updated to refresh safe count
+                runOnUiThread {
+                    peerCallbacks.forEach { it(currentPeers) }
+                }
+            }
+            
+            runOnUiThread {
+                messageCallbacks.forEach { it(message) }
             }
         }
 
         override fun onPeersUpdated(peers: List<MeshPeer>) {
+            currentPeers = peers
             runOnUiThread {
-                tvPeerCount.text = "👥 ${peers.size} peer${if (peers.size != 1) "s" else ""}"
+                peerCallbacks.forEach { it(peers) }
             }
         }
     }
 
-    /**
-     * Add a message to the display list
-     */
-    private fun addMessageToList(message: MeshMessage, isSent: Boolean) {
-        messageAdapter.addMessage(message, isSent)
-        messageAdapter.trimToSize(MAX_STORED_MESSAGES)
-        
-        // Scroll to bottom to show new message
-        rvMessages.scrollToPosition(messageAdapter.itemCount - 1)
-        
-        Log.d(TAG, "UI updated with message: ${message.id}, isSent: $isSent")
+    // Public methods for fragments
+    
+    fun registerMessageCallback(callback: (MeshMessage) -> Unit) {
+        messageCallbacks.add(callback)
     }
-
-    /**
-     * Send SOS message
-     */
-    private fun sendSOS() {
-        val sosMessage = messageHandler.createSOSMessage(deviceId)
-        meshService?.sendMessage(sosMessage)
-        
-        // Display sent message in UI
-        addMessageToList(sosMessage, isSent = true)
-        
-        Toast.makeText(this, "🚨 SOS Sent", Toast.LENGTH_SHORT).show()
-        updateStatus("SOS broadcast sent")
+    
+    fun unregisterMessageCallback(callback: (MeshMessage) -> Unit) {
+        messageCallbacks.remove(callback)
     }
-
-    /**
-     * Send text message
-     */
-    private fun sendTextMessage() {
-        val text = etMessage.text.toString().trim()
-        
-        if (text.isEmpty()) {
-            Toast.makeText(this, "Enter a message", Toast.LENGTH_SHORT).show()
-            return
-        }
-        
-        val textMessage = messageHandler.createTextMessage(text, deviceId)
-        meshService?.sendMessage(textMessage)
-        
-        // Display sent message in UI
-        addMessageToList(textMessage, isSent = true)
-        
-        etMessage.setText("")
-        Toast.makeText(this, "Message sent", Toast.LENGTH_SHORT).show()
+    
+    fun registerPeerCallback(callback: (List<MeshPeer>) -> Unit) {
+        peerCallbacks.add(callback)
+        // Immediately send current peers
+        callback(currentPeers)
     }
-
-    /**
-     * Start voice recording
-     */
-    private fun startVoiceRecording() {
-        voiceHandler.startRecording { audioData ->
-            runOnUiThread {
-                isRecording = false
-                btnRecordVoice.setImageResource(android.R.drawable.ic_btn_speak_now)
-                
-                if (audioData.isNotEmpty()) {
-                    val voiceMessage = messageHandler.createVoiceMessage(audioData, deviceId)
-                    meshService?.sendMessage(voiceMessage)
-                    
-                    // Display sent message in UI
-                    addMessageToList(voiceMessage, isSent = true)
-                    
-                    Toast.makeText(this, "Voice message sent", Toast.LENGTH_SHORT).show()
-                }
-            }
+    
+    fun unregisterPeerCallback(callback: (List<MeshPeer>) -> Unit) {
+        peerCallbacks.remove(callback)
+    }
+    
+    fun sendMessage(message: MeshMessage) {
+        meshService?.sendMessage(message)
+        // Add to history if it's a chat message or SOS
+        if (message.type != com.emergency.mesh.models.MessageType.SAFE) {
+             messageHistory.add(message)
         }
     }
-
-    /**
-     * Update status text
-     */
-    private fun updateStatus(status: String) {
-        tvStatus.text = status
+    
+    fun getMessageHistory(): List<MeshMessage> = messageHistory.toList()
+    
+    fun setPowerMode(highRange: Boolean) {
+        meshService?.setPowerMode(highRange)
+    }
+    
+    fun getPeerCount(): Int = currentPeers.size
+    
+    fun getSafePeerCount(): Int = safePeerIds.size
+    
+    fun isSafe(): Boolean = isSafeStatusSet
+    
+    fun setSafeStatus(safe: Boolean) {
+        isSafeStatusSet = safe
+        getSharedPreferences("emergency_mesh", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(PREF_SAFE_STATUS, safe)
+            .apply()
+    }
+    
+    fun updateUserRole(role: UserRole) {
+        userRole = role
+        getSharedPreferences("emergency_mesh", Context.MODE_PRIVATE)
+            .edit()
+            .putString(PREF_USER_ROLE, role.name)
+            .apply()
+        meshService?.setUserRole(role)
+    }
+    
+    fun setLanguage(languageCode: String) {
+        getSharedPreferences("emergency_mesh", Context.MODE_PRIVATE)
+            .edit()
+            .putString(PREF_LANGUAGE, languageCode)
+            .apply()
+        
+        // Apply language change
+        val locale = Locale(languageCode)
+        Locale.setDefault(locale)
+        val config = Configuration(resources.configuration)
+        config.setLocale(locale)
+        resources.updateConfiguration(config, resources.displayMetrics)
+        
+        // Recreate activity to apply changes
+        recreate()
+    }
+    
+    fun getCurrentLanguage(): String {
+        return getSharedPreferences("emergency_mesh", Context.MODE_PRIVATE)
+            .getString(PREF_LANGUAGE, "en") ?: "en"
     }
 }

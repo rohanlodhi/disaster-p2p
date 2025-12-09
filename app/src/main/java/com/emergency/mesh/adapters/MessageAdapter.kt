@@ -33,7 +33,8 @@ data class MessageItem(
  */
 class MessageAdapter(
     private val context: Context,
-    private val onVoiceMessageClick: (MeshMessage) -> Unit
+    private val onVoiceMessageClick: (MeshMessage) -> Unit,
+    private val onSenderClick: (MeshMessage) -> Unit
 ) : RecyclerView.Adapter<MessageAdapter.MessageViewHolder>() {
 
     private val messages = mutableListOf<MessageItem>()
@@ -80,6 +81,14 @@ class MessageAdapter(
                 holder.tvMessageType.visibility = View.VISIBLE
                 holder.tvMessageType.text = "🚨 EMERGENCY SOS"
                 holder.bubbleContainer.background = ContextCompat.getDrawable(context, R.drawable.bubble_sos)
+                holder.tvContent.visibility = View.VISIBLE
+                holder.tvContent.text = message.content
+                holder.voiceContainer.visibility = View.GONE
+            }
+            MessageType.SAFE -> {
+                holder.tvMessageType.visibility = View.VISIBLE
+                holder.tvMessageType.text = "✅ SAFE"
+                holder.bubbleContainer.background = ContextCompat.getDrawable(context, R.drawable.bubble_safe)
                 holder.tvContent.visibility = View.VISIBLE
                 holder.tvContent.text = message.content
                 holder.voiceContainer.visibility = View.GONE
@@ -132,6 +141,12 @@ class MessageAdapter(
         }
         holder.tvSender.text = senderName
         holder.tvSender.visibility = if (isSent) View.GONE else View.VISIBLE
+        
+        if (!isSent) {
+            holder.tvSender.setOnClickListener {
+                onSenderClick(message)
+            }
+        }
 
         // Location - clickable to open Google Maps
         if (message.latitude != null && message.longitude != null) {
@@ -164,6 +179,14 @@ class MessageAdapter(
      */
     fun addMessage(message: MeshMessage, isSent: Boolean) {
         messages.add(MessageItem(message, isSent))
+        notifyItemInserted(messages.size - 1)
+    }
+
+    /**
+     * Add a new message item to the list
+     */
+    fun addMessage(item: MessageItem) {
+        messages.add(item)
         notifyItemInserted(messages.size - 1)
     }
 
